@@ -9,39 +9,81 @@ import {
 import Header from "../../components/Header";
 import Button from "../../components/Button";
 import Input from "../../components/Input";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, type Control } from "react-hook-form";
 import * as yup from "yup";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
+import { RootParamsScreen } from "../../types/Navigation";
+import { useReducer } from "react";
+import { yupResolver } from "@hookform/resolvers/yup";
+
+interface FormState {
+  isSubmitting: boolean;
+}
+
+type FormAction = { type: "SUBMITTING" } | { type: "SUBMITTED" };
+
+interface FormData {
+  email: string;
+  password: string;
+}
+
+const initialState: FormState = {
+  isSubmitting: false,
+};
+
+const formReduce = (state: FormState, action: FormAction): FormState => {
+  switch (action.type) {
+    case "SUBMITTING":
+      return { isSubmitting: true };
+    case "SUBMITTED":
+      return { isSubmitting: false };
+    default:
+      return state;
+  }
+};
+const schema = yup.object().shape({
+  email: yup.string().email("Invalid email").required("Email is required"),
+  password: yup
+    .string()
+    .min(6, "Password must be at least 8 characters")
+    .required("Password is required"),
+});
 
 export default function SignIn() {
-  const navigation = useNavigation(); // Add this line
+  const [state, dispatch] = useReducer(formReduce, initialState);
+  const navigation = useNavigation<RootParamsScreen>(); // Add this line
   const {
     control,
     handleSubmit,
     formState: { errors },
-  } = useForm({
+  } = useForm<FormData>({
     defaultValues: {
       email: "",
       password: "",
     },
+
+    resolver: yupResolver(schema),
   });
 
-  const schema = yup.object().shape({
-    email: yup.string().email("Invalid email").required("Email is required"),
-    password: yup
-      .string()
-      .min(6, "Password must be at least 8 characters")
-      .required("Password is required"),
-  });
-
-  const onSubmit = (data: any) => {
+  const onSubmit = (data: FormData) => {
     schema.validate(data).then(() => {
-      AsyncStorage.getItem("newUser").then(() => {
-        if (data) {
-          navigation.navigate("Home");
-        }
-      });
+      if (data) {
+        dispatch({ type: "SUBMITTING" });
+
+        setTimeout(
+          () => {
+            Alert.alert("Form Data", JSON.stringify(data));
+            dispatch({ type: "SUBMITTED" });
+          },
+
+          2000
+        );
+      }
+      Alert.alert(
+        "Dados informado",
+        "Revise os campos pois dados nao sao coerente"
+      );
     });
   };
 
@@ -58,7 +100,7 @@ export default function SignIn() {
           </View>
           <KeyboardAvoidingView>
             <Controller
-              control={control}
+              control={control as Control<FormData>}
               rules={{
                 required: true,
               }}
@@ -81,7 +123,7 @@ export default function SignIn() {
             {errors.email && <Text className="mb-5">Email Requirido</Text>}
 
             <Controller
-              control={control}
+              control={control as Control<FormData>}
               rules={{
                 required: true,
                 maxLength: 6,
@@ -105,6 +147,7 @@ export default function SignIn() {
 
             <View className="items-center my-4 ">
               <Button
+                title={state.isSubmitting ? "Submitting..." : "Submit"}
                 onPress={handleSubmit(onSubmit)}
                 className="bg-zinc-800 w-[50%] p-2 items-center rounded-full"
               >
